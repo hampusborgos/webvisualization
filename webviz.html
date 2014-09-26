@@ -1,0 +1,126 @@
+<html>
+<head>
+<title>Awesome visualization</title>
+<script>
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+function init() {
+  // webkit shim
+  window.AudioContext = window.AudioContext || window.webkitAudioContext;
+  navigator.getUserMedia = ( navigator.getUserMedia ||
+    navigator.webkitGetUserMedia ||
+    navigator.mozGetUserMedia ||
+    navigator.msGetUserMedia);
+  window.URL = window.URL || window.webkitURL;
+
+  var audioCtx = new AudioContext;
+  try {
+    console.log('Audio context set up.');
+    console.log('navigator.getUserMedia ' + (navigator.getUserMedia ? 'available.' : 'not present!'));
+  } catch (e) {
+    alert('No web audio support in this browser!' + e);
+  }
+
+  // Create script processor
+  var scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
+
+  scriptNode.onaudioprocess = function(audioProcessingEvent)
+  {
+    // The input buffer is the song we loaded earlier
+    var inputBuffer = audioProcessingEvent.inputBuffer;
+
+    // Loop through the 4096 samples
+    render(inputBuffer);
+  }
+
+
+
+  // Record from microphone
+  console.log("Request microphone access");
+  navigator.getUserMedia({audio: true}, function(mediaStream) {
+    console.log('Got media stream ' + mediaStream);
+
+    var source = audioCtx.createMediaStreamSource(mediaStream);
+
+    source.connect(scriptNode);
+    scriptNode.connect(audioCtx.destination);
+
+    var everySecond = function() {
+      console.log("Recorded for " + audioCtx.currentTime);
+      setTimeout(everySecond, 2000);
+    }
+
+    everySecond();
+    // setTimeout(function() { mediaStream.stop(); }, 2000);
+  }, function(e) {
+    console.log('No live audio input: ' + e.message);
+    throw e;
+  });
+};
+
+</script>
+</head>
+<body onload="init()">
+
+<canvas id="screen" width="512" height="512" style="width: 100%; height: 100%;"/>
+
+<script type="text/javascript">
+
+var ctx = document.getElementById("screen").getContext("2d");
+
+var screenWidth = 512;
+var screenHeight = 512;
+
+ctx.filleStyle = 'black';
+ctx.fillRect(0, 0, screenWidth, screenHeight);
+
+ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+
+function render(channel)
+{
+  var buffer = channel.getChannelData(0);
+  var imageData = ctx.createImageData(1, 1);
+  var pixel = imageData.data;
+
+  ctx.strokeStyle = 'rgba(' + Math.round(Math.random() * 255) + ',' + Math.round(Math.random() * 255) + ',' + Math.round(Math.random() * 255) + ',1)';
+
+  ctx.fillRect(0, 0, screenWidth, screenHeight);
+  ctx.beginPath();
+  ctx.moveTo(0, screenHeight / 2);
+
+  for (var i = 0; i < channel.length; i++) {
+    var sample = buffer[i];
+    var x = (i * screenWidth) / channel.length;
+    var y = (sample * screenHeight / 2) + screenHeight / 2;
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.closePath();
+
+/*
+  var maxValue = 0;
+  for (var sample = 0; sample < channel.length; sample++)
+  {
+    if (maxValue < buffer[sample])
+      maxValue = buffer[sample];
+  }
+
+  
+  for (var sample = 0; sample < channel.length; sample++)
+  {
+    // make output equal to the same as the input
+    pixel[1] = buffer[sample] / maxValue * 256;
+    pixel[2] = buffer[sample] / maxValue * 256;
+    pixel[0] = buffer[sample] / maxValue * 256;
+    pixel[3] = 255;
+    ctx.putImageData(imageData, sample % 64, parseInt(sample / 64, 10));
+  }
+  */
+}
+
+</script>
+
+</body>
+</html>
+
