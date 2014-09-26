@@ -5,7 +5,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-function init() {
+function initAudioRecorder(outputCtx, effect)
+{
   // webkit shim
   window.AudioContext = window.AudioContext || window.webkitAudioContext;
   navigator.getUserMedia = ( navigator.getUserMedia ||
@@ -31,15 +32,15 @@ function init() {
     var inputBuffer = audioProcessingEvent.inputBuffer;
 
     // Loop through the 4096 samples
-    render(inputBuffer);
+    effect.render(outputCtx, inputBuffer);
   }
-
-
 
   // Record from microphone
   console.log("Request microphone access");
   navigator.getUserMedia({audio: true}, function(mediaStream) {
     console.log('Got media stream ' + mediaStream);
+
+    effect.init(outputCtx);
 
     var source = audioCtx.createMediaStreamSource(mediaStream);
 
@@ -57,51 +58,57 @@ function init() {
     console.log('No live audio input: ' + e.message);
     throw e;
   });
-};
+}
+
+function init(effect)
+{
+  var canvas = document.getElementById("outputCanvas");
+  var outputCtx = canvas.getContext("2d");
+  initAudioRecorder(outputCtx, effect);
+}
+
+var effect = {
+  init: function(screen)
+  {
+    screen.filleStyle = 'black';
+    screen.fillRect(0, 0, screen.canvas.width, screen.canvas.height);
+    screen.fillStyle = 'rgba(0, 0, 0, 0.04)';
+  },
+
+  render: function(screen, channel)
+  {
+    var buffer = channel.getChannelData(0);
+    var imageData = screen.createImageData(1, 1);
+    var pixel = imageData.data;
+    var screenWidth = screen.canvas.width;
+    var screenHeight = screen.canvas.height;
+
+    screen.strokeStyle = 'rgba(' + Math.round(Math.random() * 255) + ',' + Math.round(Math.random() * 255) + ',' + Math.round(Math.random() * 255) + ',1)';
+
+    screen.fillRect(0, 0, screenWidth, screenHeight);
+    screen.beginPath();
+    
+    for (var i = 0; i < channel.length; i++) {
+      var sample = buffer[i];
+      var x = (i * screenWidth) / channel.length;
+      var y = (sample * screenHeight / 2) + screenHeight / 2;
+
+      var angle = x / (2 * Math.PI)
+      var dx = y/2 * Math.cos(angle) + screenWidth / 2
+      var dy = y/2 * Math.sin(angle) + screenHeight / 2
+
+      screen.lineTo(dx, dy);
+    }
+    screen.stroke();
+    screen.closePath();
+  },
+}
 
 </script>
 </head>
-<body onload="init()" style="padding: 0; margin: 0">
+<body onload="init(effect)" style="padding: 0; margin: 0">
 
-<canvas id="screen" width="512" height="512" style="width: 100%; height: 100%; margin: 0; padding: 0"/>
-
-<script type="text/javascript">
-
-var ctx = document.getElementById("screen").getContext("2d");
-
-var screenWidth = 512;
-var screenHeight = 512;
-
-ctx.filleStyle = 'black';
-ctx.fillRect(0, 0, screenWidth, screenHeight);
-
-ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
-
-function render(channel)
-{
-  var buffer = channel.getChannelData(0);
-  var imageData = ctx.createImageData(1, 1);
-  var pixel = imageData.data;
-
-  ctx.strokeStyle = 'rgba(' + Math.round(Math.random() * 255) + ',' + Math.round(Math.random() * 255) + ',' + Math.round(Math.random() * 255) + ',1)';
-
-  ctx.fillRect(0, 0, screenWidth, screenHeight);
-  ctx.beginPath();
-  
-  for (var i = 0; i < channel.length; i++) {
-    var sample = buffer[i];
-    var x = (i * screenWidth) / channel.length;
-    var y = (sample * screenHeight / 2) + screenHeight / 2;
-
-    var angle = x / (2 * Math.PI)
-    var dx = y/2 * Math.cos(angle) + screenWidth / 2
-    var dy = y/2 * Math.sin(angle) + screenHeight / 2
-
-    ctx.lineTo(dx, dy);
-  }
-  ctx.stroke();
-  ctx.closePath();
-}
+<canvas id="outputCanvas" width="512" height="512" style="width: 100%; height: 100%;"/>
 
 </script>
 
